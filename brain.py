@@ -99,6 +99,18 @@ def create_feature(project, feature_name):
         "architecture.md": "# Architecture Decision\n\n## Options Considered\n\n## Selected Approach\n\n## Tradeoffs\n",
         "tasks.md": "# Task Breakdown\n\n## Overview\n\n## Tasks\n\n1.\n2.\n3.\n\n## Scope Decisions\n\n## Implementation Order\n",
         "implementation.md": "# Implementation Summary\n\n## Files Changed\n\n## Code Flow\n\n## Design Decisions\n",
+        "tests.md": (
+            f"# Test Plan\n\n"
+            f"Feature: {feature_name}\n\n"
+            f"## Test Strategy\n\n"
+            f"## Test Cases\n\n"
+            f"| # | Description | Type | Status |\n"
+            f"|---|-------------|------|--------|\n"
+            f"| 1 | | | |\n\n"
+            f"## Edge Cases\n\n"
+            f"## Test Results\n\n"
+            f"## Notes\n"
+        ),
         "artifacts.md": (
             "# Artifacts\n\n"
             "## Docker Images\n\n"

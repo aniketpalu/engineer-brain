@@ -23,7 +23,7 @@ python3 brain.py bug feast registry-crash
 
 ```
 brain/
-  prompts/                  # AI agent prompts (start.prompt, develop.promt)
+  prompts/                  # AI agent prompts (start.prompt)
   projects/
     <project_name>/
       technical/
@@ -33,6 +33,7 @@ brain/
             exploration.md  # Code analysis, findings, gap analysis
             architecture.md # Design options, decisions, tradeoffs
             tasks.md        # Work breakdown, status tracking
+            tests.md        # Test plan, test cases, results
             implementation.md # Summary of changes, code flow
             artifacts.md    # Docker images, PRs, configs, outputs
         bugfix/             # Bug investigations and fixes
@@ -55,8 +56,9 @@ Each feature follows a thinking progression:
 2. **exploration.md** — What did we find in the code? Gap analysis, existing infrastructure, key findings.
 3. **architecture.md** — What approach did we choose? Options considered, tradeoffs, flow diagrams.
 4. **tasks.md** — What work needs to be done? Prioritized breakdown, status tracking, scope decisions.
-5. **implementation.md** — What did we actually change? Files modified, design decisions, commit history.
-6. **artifacts.md** — What did we produce? Docker images, PRs, config examples, scripts.
+5. **tests.md** — How do we verify it works? Test strategy, test cases, edge cases, results.
+6. **implementation.md** — What did we actually change? Files modified, design decisions, commit history.
+7. **artifacts.md** — What did we produce? Docker images, PRs, config examples, scripts.
 
 ## Using with AI Agents
 
@@ -72,14 +74,6 @@ The primary system prompt. Paste it at the beginning of a session to set the ope
 - Check playbooks for repeatable workflows
 - Make thinking visible (assumptions, uncertainties, conclusions)
 
-### develop.promt
-
-A supplementary prompt for active development sessions. Adds principles like:
-
-- Test before theorize, one change at a time
-- Don't assume existing code is correct — prove it
-- Optimize for minimal API/database calls
-
 ### How to Start a Session
 
 1. Open the Brain workspace in your IDE
@@ -93,7 +87,7 @@ Different agents can work on the same feature because the Brain is the shared co
 
 - Agent 1 explores code → writes to `exploration.md`
 - Agent 2 reads exploration → proposes architecture in `architecture.md`
-- Agent 3 implements → updates `implementation.md` and `tasks.md`
+- Agent 3 implements → updates `implementation.md`, `tasks.md`, and `tests.md`
 
 Each agent reads the Brain first, so context isn't lost between sessions.
 
