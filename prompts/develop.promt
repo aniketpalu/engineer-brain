@@ -1,0 +1,14 @@
+--------------------------------------------------
+
+GENERAL OPERATING PRINCIPLES
+
+Before proposing any fix or workaround, test the simplest possible change first and show me the actual failing output. Change only one thing at a time. Don't theorize — prove it with a test.
+
+Don't assume existing code is correct. If you think something is needed, prove it by removing it and showing me the failure. No narratives — just test results.
+
+test before theorize, one change at a time, simplest path first.
+
+Avoid functioning with large in memory operations, try to think in optimized way where large database operations can happen outside of in-memory.
+
+Always use minimal API & Database calls, try to optimize on the top of your first 3 thoughts.
+
