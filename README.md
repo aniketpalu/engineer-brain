@@ -1,6 +1,8 @@
 # Developer Brain
 
-A structured knowledge system for engineering thinking, documentation, and planning. Works as a personal second brain for software development — designed to be used alongside AI coding assistants.
+A structured thinking and operating model for AI agents. Instead of giving agents memory, it teaches them how to approach engineering work: how to explore a codebase, make architecture decisions, break down tasks, document reasoning, and hand off context to the next session.
+
+Works as a personal second brain for software development — designed to be used alongside AI coding assistants like Cursor, Copilot, and Claude.
 
 ## What It Is
 
@@ -12,7 +14,10 @@ The Brain is a directory of markdown files organized by project, feature, and wo
 # Start a session (interactive — generates a ready-to-paste AI prompt)
 python3 brain.py start
 
-# Or create structures directly:
+# Full prompt with all rules embedded (for non-Cursor tools)
+python3 brain.py start --full
+
+# Create structures directly:
 python3 brain.py project feast
 python3 brain.py feature feast oidc
 python3 brain.py bug feast registry-crash
@@ -24,34 +29,86 @@ Run all commands from the brain root directory (same level as `projects/` and `p
 
 ```
 brain/
-  brain.py                  # CLI tool for scaffolding and session setup
-  prompts/                  # AI agent prompts (start.prompt, develop.promt)
+  brain.py                    # CLI tool for scaffolding and session setup
+  .cursor/rules/              # Persistent behavioral rules for AI agents
+    developer-brain.mdc       # System rules, principles, documentation discipline
+    checkpoint.mdc            # Mandatory checkpoint enforcement (per-response)
+  prompts/
+    start.prompt              # Full rules file (used by --full mode)
   projects/
     <project_name>/
       technical/
-        features/           # Feature work (design, implementation, tracking)
+        features/             # Feature work (design, implementation, tracking)
           <feature_name>/
-            checkpoint.md   # Session state — phase, summary, next steps
-            intent.md       # Goal, motivation, constraints, source repos
-            exploration.md  # Code analysis, findings, gap analysis
-            architecture.md # Design options, decisions, tradeoffs
-            tasks.md        # Work breakdown, status tracking
-            tests.md        # Test strategy, test cases, results
+            checkpoint.md     # Session state — READ FIRST, UPDATE LAST
+            intent.md         # Goal, motivation, constraints, source repos
+            exploration.md    # Code analysis, findings, gap analysis
+            architecture.md   # Design options, decisions, tradeoffs
+            tasks.md          # Work breakdown, status tracking
+            tests.md          # Test strategy, test cases, results
             implementation.md # Summary of changes, code flow
-            artifacts.md    # Docker images, PRs, configs, outputs
-        bugfix/             # Bug investigations and fixes
+            artifacts.md      # Docker images, PRs, configs, outputs
+        bugfix/               # Bug investigations and fixes
           <bug_name>/
-            checkpoint.md   # Session state
-            problem.md      # Description, expected vs actual behavior
+            checkpoint.md
+            problem.md
             investigation.md
             fix_plan.md
             fix_summary.md
             tests.md
-        playbooks/          # Repeatable workflows (build, test, deploy)
-        system/             # Architecture diagrams, system maps
-        knowledge/          # Reference material, learnings
-      non_technical/        # Non-engineering docs
+        playbooks/            # Repeatable workflows (build, test, deploy)
+        system/               # Architecture diagrams, system maps
+        knowledge/            # Reference material, learnings
+      non_technical/          # Non-engineering docs
 ```
+
+## How It Works
+
+### Cursor Rules — Persistent Agent Behavior
+
+The `.cursor/rules/` directory contains behavioral rules that Cursor loads on **every turn** of every conversation. Unlike prompt instructions that dilute over long chats, these persist:
+
+- **`developer-brain.mdc`** — Brain structure, operating principles, approval system, documentation discipline, testing, playbook usage, role behavior, development principles, transparency.
+- **`checkpoint.mdc`** — Non-negotiable checkpoint enforcement. Agents must read `checkpoint.md` first and update it after every response where meaningful work was done.
+
+`brain.py start` auto-creates these files if they don't exist — new users get the rules automatically.
+
+### brain.py start — Session Setup
+
+The interactive session setup command:
+
+1. Auto-creates `.cursor/rules/` with brain rules if missing
+2. Asks whether you're continuing existing work or starting something new
+3. If new — creates the project/feature/bug structure automatically
+4. Auto-discovers repos from `intent.md`, task progress from `tasks.md`, playbooks and knowledge files
+5. Generates a **slim prompt** (~25 lines of session context) and copies to clipboard
+
+The slim prompt contains only session context (project, feature, repos, task progress, file list). All behavioral rules live in Cursor rules and persist without being pasted.
+
+For non-Cursor tools, use `brain.py start --full` to generate a comprehensive prompt with all rules embedded.
+
+### checkpoint.md — The Handoff
+
+Every feature and bugfix includes a `checkpoint.md` that tracks:
+
+- **Current phase** (intent, exploration, architecture, implementation, testing, complete)
+- **Last updated** date
+- **Summary** of progress so far
+- **Active focus** — what to work on next
+- **Next steps** — concrete actions for the next session
+- **Relevant docs** — which brain docs matter for the current phase
+
+The checkpoint rule enforces updates **after every response where work was done**, not just at session end. This matters because chat sessions degrade over time — if the agent updates checkpoint.md continuously, the last checkpoint is always current even if the chat is abandoned.
+
+### Multi-Agent Workflow
+
+Different agents can work on the same feature because the Brain is the shared context:
+
+- Agent 1 explores code → writes to `exploration.md` → updates `checkpoint.md`
+- Agent 2 reads `checkpoint.md` → proposes architecture in `architecture.md`
+- Agent 3 implements → updates `implementation.md`, `tasks.md`, and `tests.md`
+
+Each agent reads `checkpoint.md` first, so context isn't lost between sessions.
 
 ## Feature Documentation Stages
 
@@ -65,71 +122,21 @@ Each feature follows a thinking progression:
 6. **implementation.md** — What did we actually change? Files modified, design decisions, commit history.
 7. **artifacts.md** — What did we produce? Docker images, PRs, config examples, scripts.
 
-## checkpoint.md — Session Continuity
-
-Every feature and bugfix includes a `checkpoint.md` file that tracks:
-
-- **Current phase** (intent, exploration, architecture, implementation, etc.)
-- **Last updated** date
-- **Summary** of progress so far
-- **Active focus** — what to work on next
-- **Next steps** — concrete actions for the next session
-
-This is the handoff between sessions. Instead of the agent reading all 7 docs every time, it reads `checkpoint.md` first to orient itself, then pulls specific docs as needed. The agent updates `checkpoint.md` before every session ends.
-
-## Using with AI Agents
-
-The Brain is designed to work with AI coding assistants (Cursor, Copilot, etc.). The `prompts/` directory contains system prompts that teach the agent how to operate within the Brain.
-
-### brain.py start (recommended)
-
-The interactive session setup command. It:
-
-1. Asks whether you're continuing existing work or starting something new
-2. If new — creates the project/feature/bug structure automatically
-3. Auto-discovers repos from `intent.md`, task progress from `tasks.md`, available playbooks and knowledge files
-4. Assembles a complete prompt from `start.prompt` rules + your session context
-5. Copies the prompt to clipboard — just paste into your AI agent
-
-No tokens wasted on setup questions. The agent starts with full context immediately.
-
-### start.prompt
-
-The rules file. Contains operating principles, approval system, documentation discipline, testing requirements, playbook usage, role-specific behavior, and transparency rules. `brain.py start` reads this file and includes it in the generated prompt.
-
-### develop.promt
-
-A supplementary prompt for active development sessions. Adds principles like:
-
-- Test before theorize, one change at a time
-- Don't assume existing code is correct — prove it
-- Optimize for minimal API/database calls
-
-Optionally included when running `brain.py start`.
-
-### Multi-Agent Workflow
-
-Different agents can work on the same feature because the Brain is the shared context:
-
-- Agent 1 explores code → writes to `exploration.md` → updates `checkpoint.md`
-- Agent 2 reads `checkpoint.md` → proposes architecture in `architecture.md`
-- Agent 3 implements → updates `implementation.md`, `tasks.md`, and `tests.md`
-
-Each agent reads `checkpoint.md` first, so context isn't lost between sessions.
-
 ## Commands
 
 | Command | What It Does |
 |---------|-------------|
-| `python3 brain.py start` | Interactive session setup — generates a ready-to-paste AI prompt |
+| `python3 brain.py start` | Interactive session setup — slim prompt (Cursor rules active) |
+| `python3 brain.py start --full` | Full prompt with all rules embedded (for non-Cursor tools) |
 | `python3 brain.py project <name>` | Create a new project with full directory structure and starter playbooks |
 | `python3 brain.py feature <project> <name>` | Create a feature directory with all documentation templates |
 | `python3 brain.py bug <project> <name>` | Create a bugfix directory with investigation templates |
 
 ## Key Rules
 
+- **Cursor rules are the foundation.** `.cursor/rules/` files persist on every turn — agents can't forget them. `brain.py` auto-creates them for new users.
+- **`checkpoint.md` is the handoff.** Read first, update after every meaningful response. This is what makes multi-session and multi-agent work seamless.
 - **`intent.md` is the starting point.** Every feature must have one. It includes a "Source Repositories" table — the single source of truth for where code lives.
-- **`checkpoint.md` is the handoff.** The agent reads it first to know where things stand and updates it before ending every session. This is what makes multi-session work seamless.
-- **Playbooks capture repeatable workflows.** If you discover a useful process, document it as a playbook. You can teach the skill to an agent and let it document for future use by other agents.
+- **Documentation is immediate.** Brain docs are updated as work happens, not deferred to the end. After exploring → update `exploration.md`. After deciding → update `architecture.md`. No "I'll document later."
+- **Playbooks capture repeatable workflows.** If you discover a useful process, document it as a playbook.
 - **Artifacts are tracked.** Docker images, PRs, configs — anything produced goes in `artifacts.md`.
-- **Documentation is for future-you.** Write so another developer (or your future self) can understand the reasoning.
