@@ -1,1 +1,43 @@
-.cursor/rules/
+# Cursor IDE
+.cursor/
+
+# Secrets / tokens
+.env
+.env.*
+token.json
+credentials.json
+*.pem
+*.key
+keycloak-ca.crt
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Node
+node_modules/
+package-lock.json
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Misc
+*.log
+notepad.txt
+
+# Generated artifacts
+*.pkl
+graphify-out/
+feast_*.html
+feast_*.json
+
+# CodeGraph (separate repo)
+codegraph/
+codegraph_cli.py
+requirements.txt
+
+# Obsidian
+.obsidian/

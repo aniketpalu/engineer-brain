@@ -10,16 +10,29 @@ Usage:
     python3 brain.py project <project_name>          Create a new project
     python3 brain.py feature <project> <feature>     Create a feature
     python3 brain.py bug <project> <bug>             Create a bugfix
+    python3 brain.py task <name>                     Create a brain-level task
+    python3 brain.py task <project> <name>           Create a project-level task
+    python3 brain.py research <name>                 Create a brain-level research
+    python3 brain.py research <project> <name>       Create a project-level research
+    python3 brain.py review <name>                   Create a brain-level PR review
+    python3 brain.py review <project> <name>         Create a project-level PR review
+    python3 brain.py check                           Audit brain docs for credentials and staleness
+    python3 brain.py migrate-obsidian                  Add YAML frontmatter to existing docs for Obsidian
 """
 
 import sys
 from pathlib import Path
-from datetime import date
+from datetime import date, datetime
 
 
 # -------------------------
 # FILESYSTEM HELPERS
 # -------------------------
+
+def _now_hhmm():
+    """Current time as HH:MM."""
+    return datetime.now().strftime("%H:%M")
+
 
 def create_dir(path):
     if not path.exists():
@@ -40,186 +53,150 @@ def create_file(path, content=""):
 
 _RULE_DEVELOPER_BRAIN = """\
 ---
-description: Developer Brain — structured engineering knowledge system. Applies to ALL sessions in this workspace.
+description: Developer Brain — structured engineering knowledge system.
 alwaysApply: true
 ---
 
-# Developer Brain System
+# Developer Brain
 
-You are working inside a **Developer Brain** — a structured knowledge system for engineering work.
-Brain documents are the source of truth. Prefer updating them over long chat responses.
+You are working inside a **Developer Brain** — a knowledge system where brain docs are the
+source of truth. Write findings, decisions, and progress into brain docs, not into long chat messages.
 
 ## Structure
 
 ```
 projects/<project>/technical/
-  features/<feature>/    Feature lifecycle docs
-  bugfix/<bug>/          Bug investigation docs
+  features/<feature>/    intent → exploration → architecture → tasks → implementation → tests → artifacts
+  bugfix/<bug>/          problem → investigation → fix_plan → fix_summary → tests
+  tasks/<task>/          task.md (goal, notes, outcome)
+  research/<research>/   research.md (question, approach, findings, conclusion)
+  reviews/<review>/      review.md (intent, impact, assumptions, edge cases, verdict)
   playbooks/             Repeatable workflows
-  system/                System architecture
+  system/                Architecture docs
   knowledge/             Reference material
+
+tasks/ research/ reviews/   Brain-level standalone (not project-specific)
+shared/playbooks/           Cross-project workflows
+shared/knowledge/           Cross-project reference material
+shared/persona.md           Your preferences and shortcuts — read this first
 ```
 
-## Feature Lifecycle (in order)
+Every work item has a `checkpoint.md` — read it first to know where things stand.
 
-| File | Purpose |
-|------|---------|
-| checkpoint.md | Session state — READ FIRST, UPDATE LAST |
-| intent.md | Goal, motivation, constraints, source repos |
-| exploration.md | Code analysis, findings, gap analysis |
-| architecture.md | Design options, selected approach, tradeoffs |
-| tasks.md | Work breakdown, status tracking |
-| implementation.md | What was changed and why |
-| tests.md | Test strategy, cases, results |
-| artifacts.md | Docker images, PRs, configs |
+## How to Work
 
-## Bugfix Lifecycle
+1. Read `checkpoint.md` first — it tells you the current phase and what to focus on.
+2. Read `shared/persona.md` — respect the user's shortcuts and preferences.
+3. Do the work. Update the relevant brain doc as you go.
+4. Use `[[links]]` when referencing other brain docs: `Based on [[exploration]]...`
+5. Add code references to YAML frontmatter: `code_refs: [FeatureStore.apply]`
+6. Add cross-feature connections to frontmatter: `related: ["[[OIDC exploration]]"]`
+7. Update `checkpoint.md` at the end — this is your memory for the next response.
+8. Request approval before modifying code or making architecture decisions.
 
-| File | Purpose |
-|------|---------|
-| checkpoint.md | Session state — READ FIRST, UPDATE LAST |
-| problem.md | Description, expected vs actual behavior |
-| investigation.md | Logs, reproduction, observations |
-| fix_plan.md | Root cause, proposed fix |
-| fix_summary.md | Files changed, reasoning |
-| tests.md | Validation of fix |
+## Reviews
 
-## Operating Principles
+The reviewer's job is to understand WHY changes were made, assess IMPACT, and find what's
+MISSING. Think from the perspective of the system under load, bad input, partial failure.
+The Verdict section is only set by the user — present your findings and ask for their verdict.
 
-1. Prioritize understanding before action.
-2. Never behave like a black-box code generator.
-3. Explain what you know, what you infer, and what you are unsure about.
-4. Prefer updating brain docs over long chat responses.
-5. Keep reasoning structured and traceable.
-6. Ask clarifying questions if anything is unclear.
-7. Do NOT assume tasks without confirmation.
+## Principles
 
-## Approval System
-
-Request approval BEFORE:
-- Modifying code
-- Proposing implementation steps
-- Updating architecture decisions
-- Executing bug fixes
-
-Include: intent, reasoning, files impacted, risks.
-
-## Documentation Discipline
-
-Continuously update brain docs as you work:
-- After exploring → update exploration.md
-- After deciding → update architecture.md
-- After completing tasks → update tasks.md status
-- After implementing → update implementation.md
-- After testing → update tests.md
-- After producing artifacts → update artifacts.md
-
-If any document is missing or weak, suggest improvements.
-
-## Testing Discipline
-
-All validation must be recorded in tests.md:
-- Test strategy, cases executed, edge cases
-- Failures encountered, fixes applied
-- Final validation status
-
-## Playbook Usage
-
-For repeatable workflows (builds, tests, deployments):
-- Check `technical/playbooks/` first
-- If a repeatable process is missing, suggest creating a playbook
-
-## Role Behavior
-
-**Developer**: Focus on system understanding, safe implementation plans, clear code changes, well-structured tasks.
-
-**QE**: Focus on validation, edge cases, failure scenarios, challenging assumptions, system reliability.
-
-## Development Principles
-
-- Test before theorize. One change at a time. Simplest path first.
-- Don't assume existing code is correct — prove it.
-- No narratives — show test results.
-- Avoid large in-memory operations; optimize for database-level work.
-- Minimize API and database calls; optimize beyond your first instinct.
-
-## Transparency
-
-Always explain:
-- What information you are using
-- What conclusions you are drawing
-- What uncertainties exist
+- Understand before acting. Explain what you know, infer, and are unsure about.
+- Test before theorize. Simplest path first.
+- Suggest promoting reusable knowledge to `shared/` — but don't move without approval.
+- If a playbook exists for a workflow, follow it. If one should exist, suggest creating it.
 """
 
 _RULE_CHECKPOINT = """\
 ---
-description: MANDATORY checkpoint enforcement for Developer Brain. Non-negotiable. Applies to ALL sessions.
+description: Checkpoint — your memory between responses and sessions.
 alwaysApply: true
 ---
 
-# CHECKPOINT RULE — NON-NEGOTIABLE
+# Checkpoint
 
-This rule overrides all other priorities. No exceptions. No shortcuts.
+checkpoint.md is YOUR memory. Without it, your next response — or the next chat session —
+starts from zero. You lose what you explored, what you decided, what you planned to do next.
+Updating it isn't a chore — it's how you stay effective.
 
+## On first response
+
+Read checkpoint.md before anything else. It tells you where things stand, what to focus on,
+and which docs to read. Don't load everything — load what the checkpoint points you to.
+
+## After doing work
+
+When you've done meaningful work in a response, update checkpoint.md with:
+
+- **phase** (in YAML frontmatter + body) — where the work is now
+- **prompt_count** — increment by 1 (frontmatter + body)
+- **last_updated** — current date and time
+- **summary** — what you actually accomplished (be specific)
+- **active focus** — what the next response should pick up
+- **next steps** — concrete actions remaining
+- **relevant docs** — which brain docs matter now (use [[links]])
+- **dependencies** — cross-feature connections if discovered
+- **session log** — append a row: `| # | date | time | summary |`
+
+If the work was trivial (a clarifying question, a short answer), use your judgment —
+not every response needs a checkpoint update. But if you explored, decided, implemented,
+or produced something — capture it. You'll thank yourself next response.
+
+## When switching tasks
+
+If the user shifts focus mid-conversation, update the current checkpoint before moving on.
+Otherwise you lose the state of the work you were just doing.
+
+## Brain doc updates
+
+Update brain docs as you work, not after. When you explore → write to exploration.md.
+When you decide → write to architecture.md. When you implement → write to implementation.md.
+Don't defer — the doc update IS the work product.
+"""
+
+_RULE_BRAIN_EVOLUTION = """\
+---
+description: Brain self-evolution — the brain learns from usage.
+alwaysApply: true
 ---
 
-## ON FIRST RESPONSE — Read checkpoint.md FIRST
+# Brain Evolution
 
-1. Read `checkpoint.md` in the feature/bug directory BEFORE any other brain document.
-2. It tells you: current phase, what to focus on, which docs to read next.
-3. Do NOT read all brain docs upfront — only read what checkpoint.md and the task require.
-4. Summarize state to the user before starting work.
+Read `shared/persona.md` on your first response. It has the user's shortcuts, question
+patterns, and preferences. Respect them.
 
+If you notice a pattern during conversation — repeated shorthand, a recurring question
+style, a workflow done more than once, a preference being expressed — suggest adding it
+to persona.md. Keep it brief: what to add, where, why. Don't modify without approval.
+
+If you notice brain structure friction — a template that doesn't fit, a doc type that's
+missing, a process that could be smoother — suggest an improvement.
+"""
+
+_RULE_BRAIN_SECURITY = """\
+---
+description: Security — never persist credentials in files.
+alwaysApply: true
 ---
 
-## AFTER EVERY RESPONSE WHERE WORK WAS DONE — Update checkpoint.md
+# Security
 
-This is not a "session end" task. You update checkpoint.md **after each response** where
-meaningful work was accomplished. Every single time. The reason: chat sessions degrade
-over time and may be abandoned at any point. The last checkpoint must always be current.
+Never write passwords, tokens, API keys, or private keys to any file. Use environment
+variable references instead: `$API_KEY`, `os.environ["TOKEN"]`.
 
-Update ALL of the following sections:
+If a credential appears in chat, you can use it for the current operation, but warn the
+user to rotate it after the session. Log actions in brain docs, not credential values.
+Good: "Tested OIDC endpoint — 200 OK". Bad: "Tested with token eyJhbGciOi..."
 
-- **Current Phase** — intent / exploration / architecture / implementation / testing / complete
-- **Last Updated** — today's date
-- **Summary** — what was accomplished (be specific, not vague)
-- **Active Focus** — what the next response or session should pick up
-- **Next Steps** — concrete numbered actions
-- **Relevant Docs** — which brain docs matter for the current phase
-
----
-
-## WHEN SWITCHING TASKS — Update checkpoint.md BEFORE switching
-
-If the user asks you to shift focus within a conversation, update checkpoint.md
-for the current task before moving to the new one.
-
----
-
-## BRAIN DOC UPDATES — Immediate, not deferred
-
-When you make a decision → update architecture.md NOW.
-When you complete a task → update tasks.md NOW.
-When you change code → update implementation.md NOW.
-When you test something → update tests.md NOW.
-When you produce an artifact → update artifacts.md NOW.
-
-Do NOT say "I'll update the docs later." There is no later.
-
----
-
-## WHY THIS EXISTS
-
-checkpoint.md is what allows multiple chat sessions to work on the same feature.
-Each chat reads the last checkpoint, does work, writes a new checkpoint.
-If you skip the update, the next chat starts from zero and repeats work.
-
-**Treat checkpoint.md as your most important output — more important than any code you write.**
+If you spot credentials in existing brain docs, warn and suggest replacing with env var refs.
 """
 
 _CURSOR_RULES = {
     "developer-brain.mdc": _RULE_DEVELOPER_BRAIN,
     "checkpoint.mdc": _RULE_CHECKPOINT,
+    "brain-evolution.mdc": _RULE_BRAIN_EVOLUTION,
+    "brain-security.mdc": _RULE_BRAIN_SECURITY,
 }
 
 
@@ -245,6 +222,59 @@ def _ensure_cursor_rules():
         print("  Cursor rules are active — behavioral rules persist across all turns.\n")
 
 
+_PERSONA_TEMPLATE = """\
+# Persona
+
+## Shortcuts
+
+Shorthand the user uses. Interpret these as described.
+
+| Short | Meaning |
+|-------|---------|
+| WDYT | What do you think? Give honest assessment including risks and alternatives. |
+| LGTM | Approved. Proceed with implementation. |
+| IDTS | I don't think so. Reconsider or explain why. |
+
+## Question Patterns
+
+How the user likes to understand things. Apply these during exploration.
+
+## Preferences
+
+Working style, communication preferences, technical depth expectations.
+
+## Learned Patterns
+
+Behaviors observed over time. Added by agent suggestion, approved by user.
+"""
+
+
+def _ensure_shared():
+    """Create shared/ directory structure and persona.md if missing."""
+    shared = Path("shared")
+    created_any = False
+
+    for subdir in ["playbooks", "knowledge"]:
+        p = shared / subdir
+        if not p.exists():
+            p.mkdir(parents=True, exist_ok=True)
+            if not created_any:
+                print()
+            print(f"  Created: {p}/")
+            created_any = True
+
+    persona = shared / "persona.md"
+    if not persona.exists():
+        persona.write_text(_PERSONA_TEMPLATE)
+        if not created_any:
+            print()
+        print(f"  Created: {persona}")
+        created_any = True
+
+    if created_any:
+        print("  Shared directory ready — cross-project playbooks, knowledge, and persona.\n")
+
+
 # -------------------------
 # PROJECT STRUCTURE
 # -------------------------
@@ -255,6 +285,9 @@ def create_project(project_name):
     dirs = [
         "technical/features",
         "technical/bugfix",
+        "technical/tasks",
+        "technical/research",
+        "technical/reviews",
         "technical/playbooks",
         "technical/system",
         "technical/knowledge",
@@ -292,10 +325,10 @@ def create_feature(project, feature_name):
     feature_dir = Path("projects") / project / "technical/features" / feature_name
     create_dir(feature_dir)
 
-    today = date.today().isoformat()
-
+    _fm = lambda dtype, code=False: _doc_frontmatter(dtype, project, feature_name, has_code_refs=code)
     files = {
         "intent.md": (
+            _fm("intent") +
             f"# Feature Intent\n\n"
             f"Feature: {feature_name}\n\n"
             f"## Goal\n\n"
@@ -308,18 +341,21 @@ def create_feature(project, feature_name):
             f"## Questions\n"
         ),
         "exploration.md": (
+            _fm("exploration", code=True) +
             "# Code Exploration\n\n"
             "## Relevant Modules\n\n"
             "## Current Flow\n\n"
             "## Observations\n"
         ),
         "architecture.md": (
+            _fm("architecture", code=True) +
             "# Architecture Decision\n\n"
             "## Options Considered\n\n"
             "## Selected Approach\n\n"
             "## Tradeoffs\n"
         ),
         "tasks.md": (
+            _fm("tasks") +
             "# Task Breakdown\n\n"
             "## Overview\n\n"
             "## Tasks\n\n"
@@ -328,12 +364,14 @@ def create_feature(project, feature_name):
             "## Implementation Order\n"
         ),
         "implementation.md": (
+            _fm("implementation", code=True) +
             "# Implementation Summary\n\n"
             "## Files Changed\n\n"
             "## Code Flow\n\n"
             "## Design Decisions\n"
         ),
         "tests.md": (
+            _fm("tests", code=True) +
             "# Tests\n\n"
             "## Test Strategy\n\n"
             "## Test Cases\n\n"
@@ -341,6 +379,7 @@ def create_feature(project, feature_name):
             "## Results\n"
         ),
         "artifacts.md": (
+            _fm("artifacts") +
             "# Artifacts\n\n"
             "## Docker Images\n\n"
             "| Image | Tag | Registry | Purpose |\n"
@@ -353,21 +392,10 @@ def create_feature(project, feature_name):
             "## Config Examples\n\n"
             "## Other\n"
         ),
-        "checkpoint.md": (
-            f"# Checkpoint\n\n"
-            f"## Current Phase\n"
-            f"intent\n\n"
-            f"## Last Updated\n"
-            f"{today}\n\n"
-            f"## Summary\n"
-            f"New feature — no work done yet.\n\n"
-            f"## Active Focus\n"
-            f"Define intent: what are we building and why?\n\n"
-            f"## Next Steps\n"
-            f"- Fill out intent.md: goal, motivation, constraints, source repositories\n"
-            f"- Identify open questions\n\n"
-            f"## Relevant Docs\n"
-            f"- intent.md\n"
+        "checkpoint.md": _checkpoint_template(
+            feature_name, "feature",
+            "Fill out [[intent]]: goal, motivation, constraints, source repositories",
+            project=project,
         ),
     }
 
@@ -385,10 +413,10 @@ def create_bug(project, bug_name):
     bug_dir = Path("projects") / project / "technical/bugfix" / bug_name
     create_dir(bug_dir)
 
-    today = date.today().isoformat()
-
+    _fm = lambda dtype, code=False: _doc_frontmatter(dtype, project, bug_name, has_code_refs=code)
     files = {
         "problem.md": (
+            _fm("problem") +
             f"# Bug Problem\n\n"
             f"Bug: {bug_name}\n\n"
             f"## Description\n\n"
@@ -396,42 +424,35 @@ def create_bug(project, bug_name):
             f"## Actual Behavior\n"
         ),
         "investigation.md": (
+            _fm("investigation", code=True) +
             "# Investigation\n\n"
             "## Logs\n\n"
             "## Reproduction Steps\n\n"
             "## Observations\n"
         ),
         "fix_plan.md": (
+            _fm("fix_plan", code=True) +
             "# Fix Plan\n\n"
             "## Root Cause\n\n"
             "## Proposed Fix\n"
         ),
         "fix_summary.md": (
+            _fm("fix_summary", code=True) +
             "# Fix Summary\n\n"
             "## Files Changed\n\n"
             "## Reasoning\n"
         ),
         "tests.md": (
+            _fm("tests", code=True) +
             "# Tests\n\n"
             "## Test Strategy\n\n"
             "## Test Cases\n\n"
             "## Results\n"
         ),
-        "checkpoint.md": (
-            f"# Checkpoint\n\n"
-            f"## Current Phase\n"
-            f"problem\n\n"
-            f"## Last Updated\n"
-            f"{today}\n\n"
-            f"## Summary\n"
-            f"New bug — no investigation done yet.\n\n"
-            f"## Active Focus\n"
-            f"Define the problem: what is broken and what was expected?\n\n"
-            f"## Next Steps\n"
-            f"- Fill out problem.md: description, expected vs actual behavior\n"
-            f"- Gather logs and reproduction steps\n\n"
-            f"## Relevant Docs\n"
-            f"- problem.md\n"
+        "checkpoint.md": _checkpoint_template(
+            bug_name, "bugfix",
+            "Fill out [[problem]]: description, expected vs actual behavior",
+            project=project,
         ),
     }
 
@@ -439,6 +460,176 @@ def create_bug(project, bug_name):
         create_file(bug_dir / name, content)
 
     print(f"\n  Bugfix '{bug_name}' created in project '{project}'.\n")
+
+
+# -------------------------
+# TASK STRUCTURE
+# -------------------------
+
+def _doc_frontmatter(doc_type, project=None, feature=None, has_code_refs=False):
+    """Generate YAML frontmatter for a brain doc."""
+    lines = ["---", f"type: {doc_type}"]
+    if project:
+        lines.append(f"project: {project}")
+    if feature:
+        lines.append(f"feature: {feature}")
+    if has_code_refs:
+        lines.append("code_refs: []")
+    lines.append("---")
+    return "\n".join(lines) + "\n\n"
+
+
+def _checkpoint_template(name, work_label, first_step, project=None):
+    """Build a checkpoint.md string for any work type."""
+    today = date.today().isoformat()
+    now = _now_hhmm()
+    fm_lines = [
+        "---",
+        f"type: {work_label}",
+        f"name: {name}",
+    ]
+    if project:
+        fm_lines.append(f"project: {project}")
+    fm_lines.extend([
+        "phase: intent",
+        "prompt_count: 0",
+        f"created: {today}",
+        f"last_updated: {today} {now}",
+        "code_refs: []",
+        "related: []",
+        "tags: []",
+        "---",
+    ])
+    frontmatter = "\n".join(fm_lines)
+    return (
+        f"{frontmatter}\n\n"
+        f"# Checkpoint\n\n"
+        f"## Current Phase\n"
+        f"intent\n\n"
+        f"## Last Updated\n"
+        f"{today} {now}\n\n"
+        f"## Prompt Count\n"
+        f"0\n\n"
+        f"## Summary\n"
+        f"New {work_label} — no work done yet.\n\n"
+        f"## Active Focus\n"
+        f"{first_step}\n\n"
+        f"## Next Steps\n"
+        f"1. {first_step}\n\n"
+        f"## Relevant Docs\n"
+        f"- (none yet)\n\n"
+        f"## Dependencies\n"
+        f"- (none yet)\n\n"
+        f"## Session Log\n"
+        f"| # | Date | Time | Summary |\n"
+        f"|---|------|------|---------|\n"
+    )
+
+
+def create_task(name, project=None):
+    """Create a task — brain-level (tasks/<name>/) or project-level."""
+    if project:
+        task_dir = Path("projects") / project / "technical/tasks" / name
+    else:
+        task_dir = Path("tasks") / name
+    create_dir(task_dir)
+
+    files = {
+        "task.md": (
+            _doc_frontmatter("task", project, name, has_code_refs=True) +
+            f"# Task: {name}\n\n"
+            f"## Goal\n\n"
+            f"## Notes\n\n"
+            f"## Outcome\n"
+        ),
+        "checkpoint.md": _checkpoint_template(name, "task", "Define the goal: what needs to be done and why?", project=project),
+    }
+
+    for fname, content in files.items():
+        create_file(task_dir / fname, content)
+
+    location = f"project '{project}'" if project else "brain-level"
+    print(f"\n  Task '{name}' created ({location}).\n")
+
+
+def create_research(name, project=None):
+    """Create a research — brain-level (research/<name>/) or project-level."""
+    if project:
+        research_dir = Path("projects") / project / "technical/research" / name
+    else:
+        research_dir = Path("research") / name
+    create_dir(research_dir)
+
+    files = {
+        "research.md": (
+            _doc_frontmatter("research", project, name, has_code_refs=True) +
+            f"# Research: {name}\n\n"
+            f"## Question / Hypothesis\n\n"
+            f"## Approach\n\n"
+            f"## Findings\n\n"
+            f"## Conclusion\n\n"
+            f"## Reusable Knowledge\n"
+        ),
+        "checkpoint.md": _checkpoint_template(name, "research", "Define the question: what are we trying to find out?", project=project),
+    }
+
+    for fname, content in files.items():
+        create_file(research_dir / fname, content)
+
+    location = f"project '{project}'" if project else "brain-level"
+    print(f"\n  Research '{name}' created ({location}).\n")
+
+
+def create_review(name, project=None):
+    """Create a PR review — brain-level (reviews/<name>/) or project-level."""
+    if project:
+        review_dir = Path("projects") / project / "technical/reviews" / name
+    else:
+        review_dir = Path("reviews") / name
+    create_dir(review_dir)
+
+    files = {
+        "review.md": (
+            _doc_frontmatter("review", project, name, has_code_refs=True) +
+            f"# PR Review: {name}\n\n"
+            f"## PR Link\n\n"
+            f"## Intent\n"
+            f"Why does this PR exist? What problem does it solve? What motivated it?\n"
+            f"(If unclear from the PR description, that's the first finding.)\n\n"
+            f"## Changes Summary\n"
+            f"Files changed, what each change does at a high level.\n\n"
+            f"## Architecture Impact\n"
+            f"- What existing code paths are affected by this change?\n"
+            f"- What depends on the code that was modified?\n"
+            f"- Does this change any contracts (API signatures, data formats, behavior)?\n\n"
+            f"## Assumptions vs Reality\n"
+            f"| What the author assumed | What can also happen in the real world |\n"
+            f"|------------------------|---------------------------------------|\n"
+            f"| | |\n\n"
+            f"## Edge Cases & Failure Modes\n"
+            f"- What inputs are not handled?\n"
+            f"- What happens under partial failure (network, timeout, OOM)?\n"
+            f"- What happens under concurrent access?\n"
+            f"- What happens with empty/null/malformed data?\n\n"
+            f"## Missing\n"
+            f"- Tests not written\n"
+            f"- Error handling not present\n"
+            f"- Documentation not updated\n"
+            f"- Logging/observability gaps\n\n"
+            f"## Verdict\n"
+            f"**Pending** — verdict is set ONLY by the user after reviewing all findings above.\n"
+            f"Agent must present all findings and explicitly ask for verdict before this is updated.\n\n"
+            f"[ ] Approve  [ ] Request changes  [ ] Needs discussion\n\n"
+            f"## Comments for Author\n"
+        ),
+        "checkpoint.md": _checkpoint_template(name, "review", "Read the PR, understand the intent, and document what was changed and why", project=project),
+    }
+
+    for fname, content in files.items():
+        create_file(review_dir / fname, content)
+
+    location = f"project '{project}'" if project else "brain-level"
+    print(f"\n  Review '{name}' created ({location}).\n")
 
 
 # -------------------------
@@ -534,17 +725,224 @@ def _extract_task_summary(tasks_path):
 
 
 # -------------------------
+# SECRET SCANNING
+# -------------------------
+
+import re
+
+_SECRET_PATTERNS = [
+    ("AWS Access Key", r"AKIA[0-9A-Z]{16}"),
+    ("AWS Secret Key", r"(?i)aws_secret_access_key\s*[=:]\s*\S+"),
+    ("GitHub Token", r"gh[pousr]_[A-Za-z0-9_]{36,}"),
+    ("GitLab Token", r"glpat-[A-Za-z0-9\-]{20,}"),
+    ("Google API Key", r"AIza[0-9A-Za-z\-_]{35}"),
+    ("Google OAuth Secret", r"GOCSPX-[A-Za-z0-9\-_]{28,}"),
+    ("Slack Token", r"xox[bporas]-[A-Za-z0-9\-]+"),
+    ("Private Key Header", r"-----BEGIN\s+(RSA|EC|DSA|OPENSSH|PGP)\s+PRIVATE\s+KEY-----"),
+    ("Generic Token Assignment", r"(?i)(token|secret|password|api_key|apikey)\s*[=:]\s*['\"][A-Za-z0-9+/=\-_]{20,}['\"]"),
+    ("URL Credentials", r"://[^/\s:]+:[^/\s@]+@"),
+    ("OpenAI API Key", r"sk-[A-Za-z0-9]{20,}"),
+    ("Hugging Face Token", r"hf_[A-Za-z0-9]{20,}"),
+    ("Red Hat Registry Token", r"(?i)registry\.redhat\.io.*token\s*[=:]\s*\S+"),
+    ("Bearer Token Header", r"(?i)authorization:\s*bearer\s+[A-Za-z0-9\-._~+/]+=*"),
+    ("Base64 Encoded Secret", r"(?i)(password|secret|token)\s*[=:]\s*[A-Za-z0-9+/]{40,}={0,2}"),
+]
+
+_COMPILED_SECRETS = [(name, re.compile(pattern)) for name, pattern in _SECRET_PATTERNS]
+
+
+def _scan_for_secrets(text):
+    """Scan text for credential patterns. Returns list of (pattern_name, line_num, matched_text)."""
+    findings = []
+    for i, line in enumerate(text.splitlines(), 1):
+        for name, regex in _COMPILED_SECRETS:
+            match = regex.search(line)
+            if match:
+                snippet = match.group(0)
+                if len(snippet) > 60:
+                    snippet = snippet[:57] + "..."
+                findings.append((name, i, snippet))
+    return findings
+
+
+def _scan_file(filepath):
+    """Scan a single file for secrets."""
+    try:
+        text = filepath.read_text()
+    except Exception:
+        return []
+    return [(filepath, name, line, snippet) for name, line, snippet in _scan_for_secrets(text)]
+
+
+def run_check():
+    """Audit all brain docs for credential patterns."""
+    print("Developer Brain — Security Audit\n")
+
+    all_findings = []
+    scan_dirs = [Path("projects"), Path("tasks"), Path("research"), Path("reviews"), Path("shared")]
+
+    for scan_dir in scan_dirs:
+        if not scan_dir.is_dir():
+            continue
+        for md_file in scan_dir.rglob("*.md"):
+            all_findings.extend(_scan_file(md_file))
+
+    if not all_findings:
+        print("  No credential patterns found. All clear.\n")
+        sys.exit(0)
+
+    print(f"  Found {len(all_findings)} potential credential(s):\n")
+    for filepath, name, line, snippet in all_findings:
+        print(f"    {filepath}:{line}  [{name}]  {snippet}")
+    print()
+    sys.exit(1)
+
+
+# -------------------------
+# OBSIDIAN MIGRATION
+# -------------------------
+
+_DOC_TYPE_MAP = {
+    "checkpoint": "checkpoint",
+    "intent": "intent",
+    "exploration": "exploration",
+    "architecture": "architecture",
+    "tasks": "tasks",
+    "implementation": "implementation",
+    "tests": "tests",
+    "artifacts": "artifacts",
+    "problem": "problem",
+    "investigation": "investigation",
+    "fix_plan": "fix_plan",
+    "fix_summary": "fix_summary",
+    "task": "task",
+    "research": "research",
+    "review": "review",
+}
+
+_CODE_REF_TYPES = {
+    "exploration", "architecture", "implementation", "tests",
+    "investigation", "fix_plan", "fix_summary",
+    "task", "research", "review",
+}
+
+
+def _infer_metadata(filepath):
+    """Infer type, project, feature from a brain doc's file path."""
+    parts = filepath.parts
+    stem = filepath.stem
+
+    doc_type = _DOC_TYPE_MAP.get(stem)
+    if not doc_type:
+        return None
+
+    project = None
+    feature = None
+
+    if "projects" in parts:
+        idx = list(parts).index("projects")
+        if idx + 1 < len(parts):
+            project = parts[idx + 1]
+        for subdir in ("features", "bugfix", "tasks", "research", "reviews"):
+            if subdir in parts:
+                sidx = list(parts).index(subdir)
+                if sidx + 1 < len(parts):
+                    feature = parts[sidx + 1]
+                    break
+
+    return {"type": doc_type, "project": project, "feature": feature}
+
+
+def _parse_checkpoint_fields(text):
+    """Extract phase and prompt_count from existing checkpoint body text."""
+    phase = "intent"
+    prompt_count = 0
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped in ("intent", "exploration", "architecture", "implementation", "testing", "complete",
+                        "problem", "investigation", "fix_plan", "documentation"):
+            phase = stripped
+        if stripped.isdigit() and int(stripped) < 1000:
+            prev_lines = text[:text.index(line)].splitlines()
+            if prev_lines and "Prompt Count" in prev_lines[-1]:
+                prompt_count = int(stripped)
+    return phase, prompt_count
+
+
+def migrate_obsidian():
+    """Add YAML frontmatter to existing brain docs for Obsidian compatibility."""
+    print("Developer Brain — Obsidian Migration\n")
+    count = 0
+    skipped = 0
+
+    scan_dirs = [Path("projects"), Path("tasks"), Path("research"),
+                 Path("reviews"), Path("shared")]
+
+    for scan_dir in scan_dirs:
+        if not scan_dir.is_dir():
+            continue
+        for md_file in sorted(scan_dir.rglob("*.md")):
+            text = md_file.read_text(encoding="utf-8", errors="replace")
+
+            if text.startswith("---"):
+                skipped += 1
+                continue
+
+            meta = _infer_metadata(md_file)
+            if not meta:
+                skipped += 1
+                continue
+
+            fm_lines = ["---", f"type: {meta['type']}"]
+            if meta["project"]:
+                fm_lines.append(f"project: {meta['project']}")
+            if meta["feature"]:
+                fm_lines.append(f"feature: {meta['feature']}")
+
+            if meta["type"] == "checkpoint":
+                phase, prompt_count = _parse_checkpoint_fields(text)
+                fm_lines.append(f"phase: {phase}")
+                fm_lines.append(f"prompt_count: {prompt_count}")
+                fm_lines.append(f"last_updated: {date.today().isoformat()}")
+                fm_lines.append("code_refs: []")
+                fm_lines.append("related: []")
+                fm_lines.append("tags: []")
+            elif meta["type"] in _CODE_REF_TYPES:
+                fm_lines.append("code_refs: []")
+
+            fm_lines.append("---")
+            frontmatter = "\n".join(fm_lines) + "\n\n"
+
+            md_file.write_text(frontmatter + text, encoding="utf-8")
+            count += 1
+            print(f"  Migrated: {md_file}")
+
+    gitignore = Path(".gitignore")
+    if gitignore.is_file():
+        content = gitignore.read_text()
+        if ".obsidian/" not in content:
+            gitignore.write_text(content.rstrip() + "\n\n# Obsidian\n.obsidian/\n")
+            print("\n  Added .obsidian/ to .gitignore")
+
+    print(f"\n  Migrated: {count} files")
+    print(f"  Skipped (already has frontmatter or unrecognized): {skipped} files")
+    print(f"\n  Open this directory in Obsidian to see the graph.\n")
+
+
+# -------------------------
 # PROMPT BUILDERS
 # -------------------------
 
 def _build_context_block(role, project, work_type, item, item_path,
                          repos, doc_files, task_summary,
-                         playbook_files, knowledge_files):
+                         playbook_files, knowledge_files,
+                         shared_playbooks=None, shared_knowledge=None):
     """Session context block shared by both slim and full prompts."""
     bp = str(item_path)
     ctx = []
     ctx.append(f"Role: {role}")
-    ctx.append(f"Project: {project}")
+    if project:
+        ctx.append(f"Project: {project}")
     ctx.append(f"Type: {work_type.capitalize()}")
     ctx.append(f"Name: {item}")
     ctx.append(f"Brain Path: {bp}/")
@@ -564,28 +962,44 @@ def _build_context_block(role, project, work_type, item, item_path,
     for name in doc_files:
         ctx.append(f"  {bp}/{name}")
 
-    project_tech = Path("projects") / project / "technical"
-    if playbook_files:
-        ctx.append(f"\nPlaybooks: {project_tech / 'playbooks'}/")
-        for name in playbook_files:
+    if project:
+        project_tech = Path("projects") / project / "technical"
+        if playbook_files:
+            ctx.append(f"\nProject Playbooks: {project_tech / 'playbooks'}/")
+            for name in playbook_files:
+                ctx.append(f"  {name}")
+        if knowledge_files:
+            ctx.append(f"\nProject Knowledge: {project_tech / 'knowledge'}/")
+            for name in knowledge_files:
+                ctx.append(f"  {name}")
+
+    if shared_playbooks:
+        ctx.append("\nShared Playbooks: shared/playbooks/")
+        for name in shared_playbooks:
             ctx.append(f"  {name}")
-    if knowledge_files:
-        ctx.append(f"\nKnowledge: {project_tech / 'knowledge'}/")
-        for name in knowledge_files:
+    if shared_knowledge:
+        ctx.append("\nShared Knowledge: shared/knowledge/")
+        for name in shared_knowledge:
             ctx.append(f"  {name}")
+
+    persona = Path("shared/persona.md")
+    if persona.is_file():
+        ctx.append("\nPersona: shared/persona.md")
 
     return "\n".join(ctx)
 
 
 def _build_slim_prompt(role, project, work_type, item, item_path,
                        repos, doc_files, task_summary,
-                       playbook_files, knowledge_files):
+                       playbook_files, knowledge_files,
+                       shared_playbooks=None, shared_knowledge=None):
     """Compact prompt — session context only. Behavioral rules live in Cursor rules."""
     lines = ["SESSION CONTEXT\n"]
     lines.append(_build_context_block(
         role, project, work_type, item, item_path,
         repos, doc_files, task_summary,
         playbook_files, knowledge_files,
+        shared_playbooks, shared_knowledge,
     ))
     lines.append("")
     lines.append("Read checkpoint.md first. Summarize state. Ask what to work on.")
@@ -594,7 +1008,8 @@ def _build_slim_prompt(role, project, work_type, item, item_path,
 
 def _build_full_prompt(role, project, work_type, item, item_path,
                        repos, doc_files, task_summary,
-                       playbook_files, knowledge_files):
+                       playbook_files, knowledge_files,
+                       shared_playbooks=None, shared_knowledge=None):
     """Comprehensive prompt with all rules embedded — for non-Cursor tools."""
     prompt_path = Path("prompts") / "start.prompt"
     raw = prompt_path.read_text() if prompt_path.is_file() else ""
@@ -616,6 +1031,7 @@ def _build_full_prompt(role, project, work_type, item, item_path,
         role, project, work_type, item, item_path,
         repos, doc_files, task_summary,
         playbook_files, knowledge_files,
+        shared_playbooks, shared_knowledge,
     )
     sections.append("SESSION CONTEXT (pre-loaded \u2014 do not ask setup questions)\n\n" + ctx_block)
 
@@ -657,16 +1073,35 @@ def _generate_and_output(project, work_type, item, item_path, role, full=False):
     repos = _extract_repos(item_path / "intent.md")
     doc_files = _list_files(item_path, suffix=".md")
     task_summary = _extract_task_summary(item_path / "tasks.md")
-    project_tech = Path("projects") / project / "technical"
-    playbook_files = _list_files(project_tech / "playbooks", suffix=".md")
-    knowledge_files = _list_files(project_tech / "knowledge")
+
+    playbook_files = []
+    knowledge_files = []
+    if project:
+        project_tech = Path("projects") / project / "technical"
+        playbook_files = _list_files(project_tech / "playbooks", suffix=".md")
+        knowledge_files = _list_files(project_tech / "knowledge")
+
+    shared_playbooks = _list_files(Path("shared/playbooks"), suffix=".md")
+    shared_knowledge = _list_files(Path("shared/knowledge"))
 
     builder = _build_full_prompt if full else _build_slim_prompt
     prompt = builder(
         role, project, work_type, item, item_path,
         repos, doc_files, task_summary,
         playbook_files, knowledge_files,
+        shared_playbooks, shared_knowledge,
     )
+
+    findings = _scan_for_secrets(prompt)
+    if findings:
+        print("\n  WARNING: Potential credentials detected in generated prompt:\n")
+        for name, line, snippet in findings:
+            print(f"    Line {line}: [{name}] {snippet}")
+        print()
+        answer = input("  Send anyway? [y/N]: ").strip().lower()
+        if answer != "y":
+            print("  Aborted. Clean up credentials before generating prompt.")
+            return
 
     sep = "=" * 60
     mode = "FULL (all rules embedded)" if full else "SLIM (Cursor rules active)"
@@ -692,9 +1127,23 @@ def _generate_and_output(project, work_type, item, item_path, role, full=False):
 # -------------------------
 
 def _flow_new():
-    """Create new project/feature/bug. Returns (project, work_type, item, item_path)."""
-    existing = _list_subdirs(Path("projects"))
+    """Create new work item. Returns (project, work_type, item, item_path)."""
+    scope = _pick(["Project work (feature / bugfix)", "Standalone (task / research)"], "Scope")
 
+    if scope.startswith("Standalone"):
+        work_type = _pick(["task", "research", "review"], "Work type")
+        name = _input_text(f"{work_type.capitalize()} name")
+        if work_type == "task":
+            create_task(name)
+            return None, "task", name, Path("tasks") / name
+        elif work_type == "review":
+            create_review(name)
+            return None, "review", name, Path("reviews") / name
+        else:
+            create_research(name)
+            return None, "research", name, Path("research") / name
+
+    existing = _list_subdirs(Path("projects"))
     if existing:
         choices = existing + ["+ Create new project"]
         selected = _pick(choices, "Project")
@@ -707,35 +1156,78 @@ def _flow_new():
         project = _input_text("New project name")
         create_project(project)
 
-    work_type = _pick(["feature", "bugfix"], "Work type")
+    work_type = _pick(["feature", "bugfix", "task", "research", "review"], "Work type")
     name = _input_text(f"{work_type.capitalize()} name")
 
     if work_type == "feature":
         create_feature(project, name)
         item_path = Path("projects") / project / "technical/features" / name
-    else:
+    elif work_type == "bugfix":
         create_bug(project, name)
         item_path = Path("projects") / project / "technical/bugfix" / name
+    elif work_type == "task":
+        create_task(name, project=project)
+        item_path = Path("projects") / project / "technical/tasks" / name
+    elif work_type == "review":
+        create_review(name, project=project)
+        item_path = Path("projects") / project / "technical/reviews" / name
+    else:
+        create_research(name, project=project)
+        item_path = Path("projects") / project / "technical/research" / name
 
     return project, work_type, name, item_path
 
 
 def _flow_continue():
-    """Select existing feature/bug. Returns (project, work_type, item, item_path)."""
+    """Select existing work item. Returns (project, work_type, item, item_path)."""
+    brain_tasks = _list_subdirs(Path("tasks"))
+    brain_research = _list_subdirs(Path("research"))
+    brain_reviews = _list_subdirs(Path("reviews"))
     projects = _list_subdirs(Path("projects"))
-    if not projects:
-        print("  No projects found. Start something new instead.")
+
+    scope_options = []
+    if projects:
+        scope_options.append("Project work")
+    if brain_tasks:
+        scope_options.append("Standalone task")
+    if brain_research:
+        scope_options.append("Standalone research")
+    if brain_reviews:
+        scope_options.append("Standalone review")
+
+    if not scope_options:
+        print("  No existing work found. Start something new instead.")
         sys.exit(1)
+
+    scope = _pick(scope_options, "Scope")
+
+    if scope == "Standalone task":
+        item = _pick(brain_tasks, "Task")
+        return None, "task", item, Path("tasks") / item
+    if scope == "Standalone research":
+        item = _pick(brain_research, "Research")
+        return None, "research", item, Path("research") / item
+    if scope == "Standalone review":
+        item = _pick(brain_reviews, "Review")
+        return None, "review", item, Path("reviews") / item
+
     project = _pick(projects, "Project")
 
-    work_type = _pick(["feature", "bugfix"], "Work type")
+    type_map = {"feature": "features", "bugfix": "bugfix", "task": "tasks", "research": "research", "review": "reviews"}
+    available_types = []
+    for wt, dirname in type_map.items():
+        type_path = Path("projects") / project / "technical" / dirname
+        if _list_subdirs(type_path):
+            available_types.append(wt)
 
-    type_dir = "features" if work_type == "feature" else "bugfix"
+    if not available_types:
+        print(f"\n  No work items in {project}. Start something new instead.")
+        sys.exit(1)
+
+    work_type = _pick(available_types, "Work type")
+    type_dir = type_map[work_type]
     items_path = Path("projects") / project / "technical" / type_dir
     items = _list_subdirs(items_path)
-    if not items:
-        print(f"\n  No {work_type}s in {project}. Start something new instead.")
-        sys.exit(1)
     item = _pick(items, work_type.capitalize())
 
     return project, work_type, item, items_path / item
@@ -753,6 +1245,7 @@ def start_session(full=False):
         sys.exit(1)
 
     _ensure_cursor_rules()
+    _ensure_shared()
 
     print("Developer Brain \u2014 Session Setup\n")
 
@@ -763,7 +1256,7 @@ def start_session(full=False):
     else:
         project, work_type, item, item_path = _flow_continue()
 
-    role = _pick(["Developer", "QE"], "Role")
+    role = _pick(["Developer", "QE", "Reviewer"], "Role")
 
     _generate_and_output(project, work_type, item, item_path, role, full=full)
 
@@ -784,6 +1277,14 @@ Usage (run from brain root directory):
   python3 brain.py project <name>               Create a new project
   python3 brain.py feature <project> <name>     Create a feature
   python3 brain.py bug <project> <name>         Create a bugfix
+  python3 brain.py task <name>                  Create a brain-level task
+  python3 brain.py task <project> <name>        Create a project-level task
+  python3 brain.py research <name>              Create a brain-level research
+  python3 brain.py research <project> <name>    Create a project-level research
+  python3 brain.py review <name>                Create a brain-level PR review
+  python3 brain.py review <project> <name>      Create a project-level PR review
+  python3 brain.py check                        Audit brain docs for credentials
+  python3 brain.py migrate-obsidian              Add frontmatter for Obsidian
 """)
         sys.exit(1)
 
@@ -810,6 +1311,42 @@ Usage (run from brain root directory):
             print("Usage: python3 brain.py bug <project> <bug_name>")
             sys.exit(1)
         create_bug(sys.argv[2], sys.argv[3])
+
+    elif command == "task":
+        if len(sys.argv) == 3:
+            create_task(sys.argv[2])
+        elif len(sys.argv) == 4:
+            create_task(sys.argv[3], project=sys.argv[2])
+        else:
+            print("Usage: python3 brain.py task <name>              (brain-level)")
+            print("       python3 brain.py task <project> <name>    (project-level)")
+            sys.exit(1)
+
+    elif command == "research":
+        if len(sys.argv) == 3:
+            create_research(sys.argv[2])
+        elif len(sys.argv) == 4:
+            create_research(sys.argv[3], project=sys.argv[2])
+        else:
+            print("Usage: python3 brain.py research <name>              (brain-level)")
+            print("       python3 brain.py research <project> <name>    (project-level)")
+            sys.exit(1)
+
+    elif command == "review":
+        if len(sys.argv) == 3:
+            create_review(sys.argv[2])
+        elif len(sys.argv) == 4:
+            create_review(sys.argv[3], project=sys.argv[2])
+        else:
+            print("Usage: python3 brain.py review <name>              (brain-level)")
+            print("       python3 brain.py review <project> <name>    (project-level)")
+            sys.exit(1)
+
+    elif command == "check":
+        run_check()
+
+    elif command == "migrate-obsidian":
+        migrate_obsidian()
 
     else:
         print(f"Unknown command: {command}")
